@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get tag name
+        id: tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Create release ZIP
+        run: |
+          cd custom_components
+          zip -r "../allnet-${{ steps.tag.outputs.TAG }}.zip" allnet/
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.TAG }}
+          name: "ALLNET ${{ steps.tag.outputs.TAG }}"
+          generate_release_notes: true
+          files: |
+            allnet-${{ steps.tag.outputs.TAG }}.zip
