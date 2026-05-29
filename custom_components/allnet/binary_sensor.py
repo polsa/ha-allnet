@@ -58,29 +58,41 @@ async def async_setup_entry(
     device_info = runtime.ha_device_info
     device_unique_id = entry.unique_id or entry.entry_id
 
-    entities: list[AllnetBinarySensorEntity] = []
-    for channel in coordinator.data.values():
-        if channel.kind != ChannelKind.BINARY_SENSOR:
-            continue
+    known_ids: set[str] = set()
 
-        raw_info = channel.raw.get("info", {})
-        chipid = str(raw_info.get("chipid", ""))
-        digital_to_text = str(channel.raw.get("digitalToText", ""))
-        dev_class = _device_class_from_channel(chipid, digital_to_text, channel.name)
+    def _check_new_entities() -> None:
+        new_entities: list[AllnetBinarySensorEntity] = []
+        for channel in coordinator.data.values():
+            if channel.kind != ChannelKind.BINARY_SENSOR:
+                continue
+            if channel.id in known_ids:
+                continue
+            known_ids.add(channel.id)
 
-        unique_id = f"{device_unique_id}_{channel.id}_binary_sensor"
-        entities.append(
-            AllnetBinarySensorEntity(
-                coordinator=coordinator,
-                channel_id=channel.id,
-                device_info=device_info,
-                unique_id=unique_id,
-                name=channel.name,
-                device_class=dev_class,
+            raw_info = channel.raw.get("info", {})
+            chipid = str(raw_info.get("chipid", ""))
+            digital_to_text = str(channel.raw.get("digitalToText", ""))
+            dev_class = _device_class_from_channel(chipid, digital_to_text, channel.name)
+
+            unique_id = f"{device_unique_id}_{channel.id}_binary_sensor"
+            new_entities.append(
+                AllnetBinarySensorEntity(
+                    coordinator=coordinator,
+                    channel_id=channel.id,
+                    device_info=device_info,
+                    unique_id=unique_id,
+                    name=channel.name,
+                    device_class=dev_class,
+                )
             )
-        )
+        if new_entities:
+            async_add_entities(new_entities)
 
-    async_add_entities(entities)
+    _check_new_entities()
+
+    entry.async_on_unload(
+        coordinator.async_add_listener(_check_new_entities)
+    )
 
 
 class AllnetBinarySensorEntity(AllnetEntity, BinarySensorEntity):

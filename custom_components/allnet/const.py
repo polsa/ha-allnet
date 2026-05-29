@@ -4,12 +4,14 @@ from __future__ import annotations
 
 DOMAIN = "allnet"
 
-CONF_USE_SSL = "use_ssl"
 CONF_DEVICE_PROFILE = "device_profile"
+CONF_USE_SSL = "use_ssl"
+CONF_VERIFY_SSL = "verify_ssl"
 
+DEFAULT_DEVICE_PROFILE = "auto"
 DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_USE_SSL = False
-DEFAULT_DEVICE_PROFILE = "auto"
+DEFAULT_VERIFY_SSL = True
 
 MIN_SCAN_INTERVAL = 10
 MAX_SCAN_INTERVAL = 3600

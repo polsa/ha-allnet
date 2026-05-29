@@ -29,9 +29,11 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_DEVICE_PROFILE,
     CONF_USE_SSL,
+    CONF_VERIFY_SSL,
     DEFAULT_DEVICE_PROFILE,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_USE_SSL,
+    DEFAULT_VERIFY_SSL,
     DOMAIN,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
@@ -59,6 +61,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_USERNAME): str,
         vol.Optional(CONF_PASSWORD): str,
         vol.Optional(CONF_USE_SSL, default=DEFAULT_USE_SSL): bool,
+        vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): bool,
         vol.Optional(CONF_DEVICE_PROFILE, default=DEFAULT_DEVICE_PROFILE): _PROFILE_SELECTOR,
     }
 )
@@ -67,6 +70,7 @@ STEP_ZEROCONF_CONFIRM_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_USERNAME): str,
         vol.Optional(CONF_PASSWORD): str,
+        vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): bool,
         vol.Optional(CONF_DEVICE_PROFILE, default=DEFAULT_DEVICE_PROFILE): _PROFILE_SELECTOR,
     }
 )
@@ -85,9 +89,10 @@ async def _validate_and_get_unique_id(
     username: str | None,
     password: str | None,
     use_ssl: bool,
+    verify_ssl: bool = True,
 ) -> tuple[str, str]:
     """Validate connection and return (unique_id, device_name). Raises on error."""
-    session = async_get_clientsession(hass)
+    session = async_get_clientsession(hass, verify_ssl=verify_ssl)
     client = AllnetClient(
         host=host,
         username=username or None,
@@ -127,10 +132,11 @@ class AllnetConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             username = user_input.get(CONF_USERNAME, "").strip() or None
             password = user_input.get(CONF_PASSWORD, "") or None
             use_ssl = user_input.get(CONF_USE_SSL, DEFAULT_USE_SSL)
+            verify_ssl = user_input.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
 
             try:
                 unique_id, name = await _validate_and_get_unique_id(
-                    self.hass, host, username, password, use_ssl
+                    self.hass, host, username, password, use_ssl, verify_ssl
                 )
             except AllnetAuthenticationError:
                 errors["base"] = "invalid_auth"
@@ -143,12 +149,11 @@ class AllnetConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 await self.async_set_unique_id(unique_id)
-                self._abort_if_unique_id_configured(
-                    updates={CONF_HOST: host}
-                )
-                data = {
+                self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+                data: dict[str, Any] = {
                     CONF_HOST: host,
                     CONF_USE_SSL: use_ssl,
+                    CONF_VERIFY_SSL: verify_ssl,
                 }
                 if username:
                     data[CONF_USERNAME] = username
@@ -171,32 +176,28 @@ class AllnetConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         host = discovery_info.host
         name = discovery_info.name.removesuffix("._http._tcp.local.")
 
-        # Filter: only accept instance names starting with "all" (e.g. "all3500")
         if not name.lower().startswith("all"):
             return self.async_abort(reason="not_allnet_device")
 
         self._discovered_host = host
         self._discovered_name = name
 
-        # Check if already configured at this host
-        await self.async_set_unique_id(None)  # reset; will be set after validation
+        self._async_abort_entries_match({CONF_HOST: host})
+
+        await self.async_set_unique_id(None)
         self._abort_if_unique_id_configured()
 
-        # Quick pre-validation: is the JSON API accessible?
         try:
             unique_id, device_name = await _validate_and_get_unique_id(
                 self.hass, host, None, None, False
             )
         except AllnetAuthenticationError:
-            # Auth required — still show confirmation, user will enter credentials
             pass
         except (AllnetConnectionError, AllnetUnsupportedFirmwareError, Exception):
             return self.async_abort(reason="cannot_connect")
         else:
             await self.async_set_unique_id(unique_id)
-            self._abort_if_unique_id_configured(
-                updates={CONF_HOST: host}
-            )
+            self._abort_if_unique_id_configured(updates={CONF_HOST: host})
             self._discovered_name = device_name
 
         self.context["title_placeholders"] = {
@@ -223,10 +224,11 @@ class AllnetConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             username = user_input.get(CONF_USERNAME, "").strip() or None
             password = user_input.get(CONF_PASSWORD, "") or None
+            verify_ssl = user_input.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
 
             try:
                 unique_id, name = await _validate_and_get_unique_id(
-                    self.hass, host, username, password, False
+                    self.hass, host, username, password, False, verify_ssl
                 )
             except AllnetAuthenticationError:
                 errors["base"] = "invalid_auth"
@@ -237,7 +239,11 @@ class AllnetConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured(updates={CONF_HOST: host})
-                data: dict[str, Any] = {CONF_HOST: host, CONF_USE_SSL: False}
+                data: dict[str, Any] = {
+                    CONF_HOST: host,
+                    CONF_USE_SSL: False,
+                    CONF_VERIFY_SSL: verify_ssl,
+                }
                 if username:
                     data[CONF_USERNAME] = username
                 if password:
@@ -253,6 +259,76 @@ class AllnetConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "name": self._discovered_name or host,
                 "host": host,
             },
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle a reconfiguration flow."""
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        errors: dict[str, str] = {}
+
+        if user_input is not None and entry is not None:
+            host = user_input[CONF_HOST].strip()
+            username = user_input.get(CONF_USERNAME, "").strip() or None
+            password = user_input.get(CONF_PASSWORD, "") or None
+            use_ssl = user_input.get(CONF_USE_SSL, DEFAULT_USE_SSL)
+            verify_ssl = user_input.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
+
+            try:
+                unique_id, name = await _validate_and_get_unique_id(
+                    self.hass, host, username, password, use_ssl, verify_ssl
+                )
+            except AllnetAuthenticationError:
+                errors["base"] = "invalid_auth"
+            except AllnetUnsupportedFirmwareError:
+                errors["base"] = "unsupported_firmware"
+            except AllnetConnectionError:
+                errors["base"] = "cannot_connect"
+            except (AllnetInvalidResponseError, Exception):
+                _LOGGER.exception("Unexpected error connecting to %s", host)
+                errors["base"] = "unknown"
+            else:
+                if unique_id != entry.unique_id:
+                    return self.async_abort(reason="unique_id_mismatch")
+                new_data = {**entry.data}
+                new_data[CONF_HOST] = host
+                new_data[CONF_USE_SSL] = use_ssl
+                new_data[CONF_VERIFY_SSL] = verify_ssl
+                if username:
+                    new_data[CONF_USERNAME] = username
+                else:
+                    new_data.pop(CONF_USERNAME, None)
+                if password:
+                    new_data[CONF_PASSWORD] = password
+                else:
+                    new_data.pop(CONF_PASSWORD, None)
+                if user_input.get(CONF_DEVICE_PROFILE):
+                    new_data[CONF_DEVICE_PROFILE] = user_input[CONF_DEVICE_PROFILE]
+                self.hass.config_entries.async_update_entry(
+                    entry, title=name, data=new_data
+                )
+                await self.hass.config_entries.async_reload(entry.entry_id)
+                return self.async_abort(reason="reconfigure_successful")
+
+        suggested: dict[str, Any] = {}
+        if entry is not None:
+            suggested = {
+                CONF_HOST: entry.data.get(CONF_HOST, ""),
+                CONF_USERNAME: entry.data.get(CONF_USERNAME, ""),
+                CONF_USE_SSL: entry.data.get(CONF_USE_SSL, DEFAULT_USE_SSL),
+                CONF_VERIFY_SSL: entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
+                CONF_DEVICE_PROFILE: entry.data.get(
+                    CONF_DEVICE_PROFILE, DEFAULT_DEVICE_PROFILE
+                ),
+            }
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_USER_DATA_SCHEMA, suggested
+            ),
             errors=errors,
         )
 
@@ -277,10 +353,11 @@ class AllnetConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             username = user_input.get(CONF_USERNAME, "").strip() or None
             password = user_input.get(CONF_PASSWORD, "") or None
             use_ssl = entry.data.get(CONF_USE_SSL, DEFAULT_USE_SSL)
+            verify_ssl = entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
 
             try:
                 await _validate_and_get_unique_id(
-                    self.hass, host, username, password, use_ssl
+                    self.hass, host, username, password, use_ssl, verify_ssl
                 )
             except AllnetAuthenticationError:
                 errors["base"] = "invalid_auth"

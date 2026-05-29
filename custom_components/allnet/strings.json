@@ -9,6 +9,7 @@
           "username": "Username",
           "password": "Password",
           "use_ssl": "Use SSL",
+          "verify_ssl": "Verify SSL certificate",
           "device_profile": "Device profile"
         },
         "data_description": {
@@ -16,6 +17,7 @@
           "username": "The username for the ALLNET web interface, if authentication is enabled.",
           "password": "The password for the ALLNET web interface, if authentication is enabled.",
           "use_ssl": "Enable this if the ALLNET device is configured for HTTPS.",
+          "verify_ssl": "Disable this to allow self-signed or untrusted SSL certificates.",
           "device_profile": "Select the device type, or leave on Auto to detect automatically."
         }
       },
@@ -25,11 +27,32 @@
         "data": {
           "username": "Username",
           "password": "Password",
+          "verify_ssl": "Verify SSL certificate",
           "device_profile": "Device profile"
         },
         "data_description": {
           "username": "Username if authentication is enabled on the device.",
           "password": "Password if authentication is enabled on the device.",
+          "verify_ssl": "Disable this to allow self-signed or untrusted SSL certificates.",
+          "device_profile": "Select the device type, or leave on Auto to detect automatically."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure ALLNET",
+        "data": {
+          "host": "Host",
+          "username": "Username",
+          "password": "Password",
+          "use_ssl": "Use SSL",
+          "verify_ssl": "Verify SSL certificate",
+          "device_profile": "Device profile"
+        },
+        "data_description": {
+          "host": "The hostname or IP address of the ALLNET device.",
+          "username": "Leave empty to remove authentication.",
+          "password": "Leave empty to remove authentication.",
+          "use_ssl": "Enable this if the ALLNET device is configured for HTTPS.",
+          "verify_ssl": "Disable this to allow self-signed or untrusted SSL certificates.",
           "device_profile": "Select the device type, or leave on Auto to detect automatically."
         }
       },
@@ -53,7 +76,9 @@
       "already_in_progress": "Configuration is already in progress",
       "not_allnet_device": "Not an ALLNET device",
       "cannot_connect": "Cannot connect to device",
-      "reauth_successful": "Re-authentication was successful"
+      "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Re-configuration was successful",
+      "unique_id_mismatch": "The device at the new address has a different serial number. Please add it as a new device instead."
     }
   },
   "options": {

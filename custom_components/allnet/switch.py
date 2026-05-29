@@ -28,22 +28,34 @@ async def async_setup_entry(
     device_info = runtime.ha_device_info
     device_unique_id = entry.unique_id or entry.entry_id
 
-    entities: list[AllnetSwitchEntity] = []
-    for channel in coordinator.data.values():
-        if channel.kind != ChannelKind.SWITCH:
-            continue
-        unique_id = f"{device_unique_id}_{channel.id}_switch"
-        entities.append(
-            AllnetSwitchEntity(
-                coordinator=coordinator,
-                channel_id=channel.id,
-                device_info=device_info,
-                unique_id=unique_id,
-                name=channel.name,
-            )
-        )
+    known_ids: set[str] = set()
 
-    async_add_entities(entities)
+    def _check_new_entities() -> None:
+        new_entities: list[AllnetSwitchEntity] = []
+        for channel in coordinator.data.values():
+            if channel.kind != ChannelKind.SWITCH:
+                continue
+            if channel.id in known_ids:
+                continue
+            known_ids.add(channel.id)
+            unique_id = f"{device_unique_id}_{channel.id}_switch"
+            new_entities.append(
+                AllnetSwitchEntity(
+                    coordinator=coordinator,
+                    channel_id=channel.id,
+                    device_info=device_info,
+                    unique_id=unique_id,
+                    name=channel.name,
+                )
+            )
+        if new_entities:
+            async_add_entities(new_entities)
+
+    _check_new_entities()
+
+    entry.async_on_unload(
+        coordinator.async_add_listener(_check_new_entities)
+    )
 
 
 class AllnetSwitchEntity(AllnetEntity, SwitchEntity):
