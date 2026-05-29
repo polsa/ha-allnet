@@ -9,7 +9,7 @@
           "username": "Username",
           "password": "Password",
           "use_ssl": "Use SSL",
-          "verify_ssl": "Verify SSL certificate",
+          "verify_ssl": "Require valid SSL certificate",
           "device_profile": "Device profile"
         },
         "data_description": {
@@ -27,7 +27,7 @@
         "data": {
           "username": "Username",
           "password": "Password",
-          "verify_ssl": "Verify SSL certificate",
+          "verify_ssl": "Require valid SSL certificate",
           "device_profile": "Device profile"
         },
         "data_description": {
@@ -44,7 +44,7 @@
           "username": "Username",
           "password": "Password",
           "use_ssl": "Use SSL",
-          "verify_ssl": "Verify SSL certificate",
+          "verify_ssl": "Require valid SSL certificate",
           "device_profile": "Device profile"
         },
         "data_description": {
