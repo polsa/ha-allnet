@@ -81,19 +81,6 @@
       "unique_id_mismatch": "The device at the new address has a different serial number. Please add it as a new device instead."
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "ALLNET options",
-        "data": {
-          "scan_interval": "Polling interval (seconds)"
-        },
-        "data_description": {
-          "scan_interval": "How often to poll the device for updated values. Minimum 10, maximum 3600 seconds."
-        }
-      }
-    }
-  },
   "selector": {
     "device_profile": {
       "options": {

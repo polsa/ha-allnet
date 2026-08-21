@@ -69,11 +69,9 @@ The integration is configured via the Home Assistant UI (config flow). No YAML c
 | **Use SSL**      | No       | Off     | Enable if the device is configured for HTTPS                   |
 | **Device profile** | No    | Auto    | `Auto`, `MSR`, or `Managed Switch` — leave on Auto in most cases |
 
-### Options (after setup)
+## Data updates
 
-| Option                   | Default | Description                                      |
-|--------------------------|---------|--------------------------------------------------|
-| **Polling interval (s)** | 30      | How often to poll the device (10–3600 seconds)   |
+Home Assistant retrieves device data every 60 seconds. Switch commands trigger an immediate refresh of all channels.
 
 ### mDNS / Zeroconf Auto-Discovery
 
